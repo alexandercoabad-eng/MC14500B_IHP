@@ -11,9 +11,8 @@
 
   "//": "Here are some of the variables you may want to change:",
 
-  "//": "PL_TARGET_DENSITY_PCT - You can increase this if Global Placement fails with error GPL-0302.",
-  "//": "Users have reported that values up to 80 worked well for them.",
-  "PL_TARGET_DENSITY_PCT": 65,
+  "//": "PL_TARGET_DENSITY_PCT - Increased to 75 to prevent GPL-0302 and leave clean whitespace for legalization.",
+  "PL_TARGET_DENSITY_PCT": 75,
 
   "PL_RESIZER_DESIGN_OPTIMIZATIONS": 0,
   "GLB_RESIZER_DESIGN_OPTIMIZATIONS": 0,
@@ -26,7 +25,9 @@
   "//": "The value is in nanoseconds, so 50ns == 20MHz.",
   "CLOCK_PERIOD": 50,
 
-  "//": "Hold slack margin - Set to 0 to prevent excessive hold buffer insertion.",
+  "//": "Explicitly disable hold repair steps to prevent detailed placement overflow (DPL-0036).",
+  "PL_RESIZER_REPAIR_HOLD": 0,
+  "GLB_RESIZER_REPAIR_HOLD": 0,
   "PL_RESIZER_HOLD_SLACK_MARGIN": 0,
   "GRT_RESIZER_HOLD_SLACK_MARGIN": 0,
   "PL_RESIZER_ALLOW_HOLD_VIOLATIONS": 1,
