@@ -11,7 +11,7 @@ module tt_um_mc14500b_soc_extended (
     input  wire       rst_n     // Active-Low Reset
 );
 
-    // Suppress unused signal warnings for Verilator
+    // Suppress unused signal warning for Verilator
     wire _unused_ok = &{1'b0, ena, 1'b0};
 
     // =========================================================================
@@ -42,7 +42,27 @@ module tt_um_mc14500b_soc_extended (
     wire actual_data = core_data_in & r_ien;
 
     // =========================================================================
-    // 2. Feature 1: Compact Clock Divider
+    // 2. Feature 1: Ultra-Lightweight Edge Detector on ui_in[0] (Address 8)
+    // =========================================================================
+    reg ui_in0_d;
+    reg edge_flag;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            ui_in0_d  <= 1'b0;
+            edge_flag <= 1'b0;
+        end else begin
+            ui_in0_d <= ui_in[0];
+            if (ui_in[0] && !ui_in0_d) begin
+                edge_flag <= 1'b1; // Detect and latch rising edge
+            end else if (core_write_en && (operand == 4'h8) && core_data_out) begin
+                edge_flag <= 1'b0; // Clear flag on writing 1 to RAM address 8
+            end
+        end
+    end
+
+    // =========================================================================
+    // 3. Feature 2: Compact Clock Divider (Address 9)
     // =========================================================================
     reg [11:0] slow_counter;
     reg        use_slow_clk;
@@ -54,7 +74,7 @@ module tt_um_mc14500b_soc_extended (
         end else begin
             slow_counter <= slow_counter + 1'b1;
             if (core_write_en && (operand == 4'h9)) begin
-                use_slow_clk <= core_data_out; // Address 9 sets clock rate flag
+                use_slow_clk <= core_data_out; // Address 9 toggles slow execution
             end
         end
     end
@@ -62,7 +82,7 @@ module tt_um_mc14500b_soc_extended (
     wire cpu_clk_step = use_slow_clk ? (slow_counter == 12'd0) : 1'b1;
 
     // =========================================================================
-    // 3. Feature 2: Dedicated Bit-Addressable Output Latch Array
+    // 4. Feature 3: Dedicated Output Latch Array (Address 12)
     // =========================================================================
     reg [7:0] latched_uo_out;
 
@@ -70,19 +90,19 @@ module tt_um_mc14500b_soc_extended (
         if (!rst_n) begin
             latched_uo_out <= 8'h00;
         end else if (core_write_en && (operand == 4'hC)) begin
-            latched_uo_out <= {latched_uo_out[6:0], core_data_out}; // Shift output bit at Address 12
+            latched_uo_out <= {latched_uo_out[6:0], core_data_out}; // Shift bit into Address 12
         end
     end
 
     // =========================================================================
-    // 4. Memory Bus Data Multiplexing
+    // 5. Memory Bus Data Multiplexing
     // =========================================================================
     wire [15:0] mapped_ram_bank;
     assign mapped_ram_bank[7:0]   = ram_bank[7:0];
-    assign mapped_ram_bank[8]     = 1'b0;            // Unused space
-    assign mapped_ram_bank[9]     = use_slow_clk;    // Feature 1 readback
-    assign mapped_ram_bank[11:10] = 2'b00;
-    assign mapped_ram_bank[12]    = latched_uo_out[0]; // Feature 2 readback
+    assign mapped_ram_bank[8]     = edge_flag;          // Feature 1 readback
+    assign mapped_ram_bank[9]     = use_slow_clk;       // Feature 2 readback
+    assign mapped_ram_bank[11:10] = 2'b00;              // Reserved
+    assign mapped_ram_bank[12]    = latched_uo_out[0];    // Feature 3 readback
     assign mapped_ram_bank[15:13] = ram_bank[15:13];
 
     assign core_data_in  = mapped_ram_bank[operand];
@@ -94,7 +114,7 @@ module tt_um_mc14500b_soc_extended (
                            ((opcode == 4'h8) || (opcode == 4'h9));
 
     // =========================================================================
-    // 5. Instruction RAM Dynamic Write Interface
+    // 6. Instruction RAM Dynamic Write Interface
     // =========================================================================
     integer i;
     always @(posedge clk or negedge rst_n) begin
@@ -108,7 +128,7 @@ module tt_um_mc14500b_soc_extended (
     end
 
     // =========================================================================
-    // 6. MC14500B Core Logic Execution Pipeline
+    // 7. MC14500B Core Logic Execution Pipeline
     // =========================================================================
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -155,7 +175,7 @@ module tt_um_mc14500b_soc_extended (
     end
 
     // =========================================================================
-    // 7. Output Signal Assignments
+    // 8. Output Signal Assignments
     // =========================================================================
     assign uo_out  = latched_uo_out;
     assign uio_out = prog_mode ? 8'h00 : {core_write_en, 1'b0, pc};
