@@ -1,63 +1,64 @@
-# MC14500B Industrial ICU & Peripheral SoC
+![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
 
-An extended System-on-Chip implementation based on the classic **Motorola MC14500B 1-Bit Industrial Control Unit (ICU)**, optimized for high-density physical implementation on the **IHP SG13G2** process node via Tiny Tapeout.
+# MC14500B Extended 1-bit Microcontroller SoC
 
----
+An advanced, self-contained 1-bit Microcontroller System on Chip (SoC) centered around a hardened clone of the iconic 1977 Motorola MC14500B Industrial Control Unit (ICU). This layout occupies a **1x2 tile footprint**[cite: 1] and is target-hardened specifically for the **TTIHP (IHP 130 nm BiCMOS SG13G2)** open-source silicon shuttle run[cite: 1, 2].
 
-## Overview
-
-The MC14500B SoC implements the standard 16-instruction set of the classic 1-bit PLC processor alongside key memory-mapped peripheral modules integrated directly into the address space:
-
-1. **64-Byte Instruction Memory** (Addressable via dynamic programming mode)
-2. **Rising Edge Detector** (Memory-mapped peripheral at address `8`)
-3. **Programmable Clock Divider / Speed Controller** (Memory-mapped peripheral at address `9`)
-4. **Dedicated Parallel Output Latch Array** (Memory-mapped peripheral at address `12` / `0xC`)
+Unlike a standalone CPU core, this macro design integrates a dynamic 64-byte program memory, static scratchpad registers, hardware-mapped peripherals (edge detector, clock divider, output latch array), and dedicated parallel I/O port interfaces directly into a single piece of silicon containing **2,810 standard cells** (excluding fill and decap cells)[cite: 2].
 
 ---
 
-## Feature Architecture
+## Architecture Upgrades: Beyond the 1977 Motorola ICU
 
-### Integrated Peripherals
+This design extends the classic 1-bit Motorola architecture into a fully autonomous microcontroller system:
 
-| RAM Address | Function / Register | Description |
-|---|---|---|
-| `0x0` – `0x7` | General Purpose Registers | Read/Write single-bit internal storage registers. |
-| `0x8` | Single-Bit Edge Detector | Captures rising edges on `ui_in[0]`. Clear flag by writing `1`. |
-| `0x9` | Clock Divider Control | Sets execution step speed (1 = slow clock mode, 0 = full speed). |
-| `0xC` | 8-Bit Output Latch Array | Bitwise dynamic shift latch driving hardware output port `uo_out`. |
-| `0xD` – `0xF` | System Inputs | Direct read access to hardware input pins `ui_in[7:0]`. |
-
----
-
-## Technical Specifications & Physical Design
-
-* **Process Node:** IHP SG13G2 (130 nm)
-* **Tile Size:** $1 \times 2$ Block
-* **Total Cell Count:** 2,810 standard cells (excluding fill/decap cells)
-* **Standard Cell Placement Utilization:** 77.59%
-* **Total Routing Wire Length:** 142,821 µm
-* **Supported Clock Frequencies:** Full system speed up to PDK target limits with flexible internal slow-step control.
+1. **On-Chip Dynamic Program RAM (64 Bytes x 8-bit Width):** The original chip had no internal program storage. This SoC integrates 64 bytes of dynamically programmable instruction memory that can be loaded in Program Mode via the control inputs (`uio_in`).
+2. **Integrated Program Counter (PC):** The standalone MC14500B lacked internal address indexing or a PC. This design includes an on-chip **6-bit hardware Program Counter register** that automatically increments on every valid execution step to loop through your instruction sequence.
+3. **Internal Data Scratchpad RAM (8 Bits):** Features 8 addressable, single-bit static memory registers (`4'h0` to `4'h7`) allowing fast internal variable read/write operations.
+4. **Memory-Mapped Integrated Peripherals:**
+   * **Single-Bit Edge Detector (`4'h8`):** Hardware edge capture module that flags rising edge transitions on `ui_in[0]`. The flag is cleared by writing `1` to RAM address `8`.
+   * **Programmable Clock Divider (`4'h9`):** Controls CPU execution speed rate. Writing `1` to address `9` enables slow execution mode.
+   * **Dedicated Parallel Output Latch Array (`4'hC`):** Bit-addressable serial-in/parallel-out shift latch array driving hardware output port `uo_out[7:0]`.
+5. **Real-Time Hardware Diagnostic Monitors (`uio_out[7:0]`):** When in Run Mode, the bidirectional status pins expose the 6-bit Program Counter (`PC`) and the core Write Enable flag directly to physical pins for logic analyzer probing and hardware debugging.
 
 ---
 
-## Pinout Map
+## Unified SoC Address Mapping Matrix
 
-| Pin | Type | Name | Function |
-|---|---|---|---|
-| `ui_in[7:0]` | Input | Parallel Data / Instructions | Instruction byte in Program Mode / General inputs in Run Mode. |
-| `uo_out[7:0]` | Output | Parallel Output Latch Array | Hardware output pins connected to peripheral register `0xC`. |
-| `uio_in[5:0]` | Input | Program Address | Program Counter write target address during programming mode. |
-| `uio_in[6]` | Input | Program Write Enable | Pulse high to write byte `ui_in` into `prog_memory[uio_in[5:0]]`. |
-| `uio_in[7]` | Input | Program Mode Select | High = Dynamic Instruction Write Mode; Low = Execution Mode. |
-| `uio_out[5:0]`| Output | Program Counter (PC) | Real-time 6-bit instruction pointer monitor. |
-| `uio_out[7]` | Output | Write Enable Monitor | Real-time execution write enable monitor flag. |
+| Bit Address (Operand) | Target Subsystem | Operational Behavior |
+| :--- | :--- | :--- |
+| **`4'h0` to `4'h7`** | **Internal Scratchpad RAM** | General-purpose read/write single-bit data registers. |
+| **`4'h8`** | **Rising Edge Detector** | Read edge flag status; write `1` to clear flag. |
+| **`4'h9`** | **Clock Divider Control** | Read/write execution speed mode (1 = slow clock step, 0 = full speed). |
+| **`4'hA` to `4'hB`** | **Reserved / Unused** | Reserved space. |
+| **`4'hC`** | **Output Latch Array** | Bitwise shift-in write access driving `uo_out[7:0]`. |
+| **`4'hD` to `4'hF`** | **Parallel Input Port** | Read-only access to physical external pins **`ui_in[7:0]`**. |
 
 ---
 
-## Quick Start & Verification
+## Automated Verification Workflows
 
-### Running Tests
-To execute functional cocotb simulation tests:
-```bash
-cd test
-make
+The verification suite splits its pipeline tasks to guarantee absolute behavioral correctness and structural layout integrity before submission[cite: 2].
+
+### 1. Behavioral RTL Simulation Loop
+Driven locally or remotely by a Python-based `cocotb` test harness. 
+* Navigate terminal focus into the verification folder: `cd test`
+* Clean and fire up the simulation environment: `make clean && make`
+
+The test framework configures a stable clock line, asserts a master reset sequence, injects binary vectors into the parallel inputs, loads instructions via dynamic programming mode, and validates output transitions.
+
+### 2. Gate-Level Netlist (GL) Layout Hardening
+When OpenLane/LibreLane finishes layout compilation, a Gate-Level simulation (`GATES=yes`) verifies the synthesized netlist cells against the physical IHP standard cell simulation libraries[cite: 2].
+
+* **Tooling Fix Note:** Because the IHP PDK simulation model files (`sg13g2_stdcell.v`) use advanced edge-sensitive timing rules wrapped inside `ifnone` constructs, standard open-source tools like Icarus Verilog v12 will crash. 
+* To resolve this, the automated **`.github/workflows/gds.yaml`** configuration passes the argument **`IVVP_ARGS: "-gno-specify"`** directly into the testing container. This bypasses timing parameters, linking all standard cells together for a clean pass[cite: 2].
+
+---
+
+## Physical ASIC Configuration Properties
+* **Process Technology Node:** IHP 130 nm BiCMOS (SG13G2)[cite: 1, 2]
+* **Layout Footprint Allocation:** $1 \times 2$ Block[cite: 1]
+* **Total Logic Cell Count:** 2,810 Cells (excluding fill and decap cells)[cite: 2]
+* **Standard Cell Placement Utilization:** ~77.6%[cite: 2]
+* **Total Routing Wire Length:** 142,821 µm[cite: 2]
+* **Top-Level Interface Module Name:** `tt_um_mc14500b_soc_extended`
