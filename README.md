@@ -1,59 +1,63 @@
-![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
+# MC14500B Industrial ICU & Peripheral SoC
 
-# MC14500B Extended 1-bit Microcontroller SoC
-
-An advanced, self-contained 1-bit Microcontroller System on Chip (SoC) centered around a hardened clone of the iconic 1977 Motorola MC14500B Industrial Control Unit (ICU). This layout occupies a **1x1 tile footprint** and is target-hardened specifically for the **TTIHP26b (IHP 130 nm BiCMOS SG13G2)** open-source silicon shuttle run.
-
-Unlike a standalone CPU core, this macro design integrates program memory, static scratchpad variable data registers, automated hardware counters, and dedicated parallel I/O port interfaces directly into a single piece of silicon containing exactly **146 logic cells** (excluding fill and tap cells).
+An extended System-on-Chip implementation based on the classic **Motorola MC14500B 1-Bit Industrial Control Unit (ICU)**, optimized for high-density physical implementation on the **IHP SG13G2** process node via Tiny Tapeout.
 
 ---
 
-## Architecture Upgrades: Beyond the 1977 Motorola ICU
+## Overview
 
-This design extends the classic 1-bit Motorola architecture into a fully autonomous microcontroller system:
+The MC14500B SoC implements the standard 16-instruction set of the classic 1-bit PLC processor alongside key memory-mapped peripheral modules integrated directly into the address space:
 
-1. **On-Chip Program ROM (256 Words x 8-bit Width):** The original chip had no internal program storage. This SoC integrates a 256-word synthesized execution ROM. Instructions use an 8-bit format where the upper nibble (`[7:4]`) represents the MC14500B CPU opcode, and the lower nibble (`[3:0]`) maps the target data address operand.
-2. **Integrated Program Counter (PC):** The standalone MC14500B lacked internal address indexing or a PC. This design includes an on-chip **8-bit hardware Program Counter register** that automatically increments on every positive clock edge to loop through your ROM application routines.
-3. **Internal Data Scratchpad RAM (16 Bits):** Features 16 addressable, single-bit static memory registers (`4'h0` to `4'hF`) allowing fast, internal variable read/write operations.
-4. **Dedicated Parallel-to-Serial Port Mapping:**
-   * **Parallel Inputs (`ui_in[7:0]`):** Automatically synced directly into the upper half of the internal RAM space (`RAM[15:8]`) on every clock event.
-   * **Parallel Outputs (`uo_out[7:0]`):** Driven continuously by the lower half of the internal RAM bank (`RAM[7:0]`), updating your external hardware lines instantly.
-5. **Real-Time Hardware Diagnostic Monitors (`uio_out[7:0]`):** Repurposes the bidirectional pins as driven outputs to act as a built-in hardware debugger. It exposes the lower 6 bits of the Program Counter, the core's internal Result Register (`RR`) state, and the active memory write-strobe clock pulse flag directly to physical pins for logic analyzer probing.
+1. **64-Byte Instruction Memory** (Addressable via dynamic programming mode)
+2. **Rising Edge Detector** (Memory-mapped peripheral at address `8`)
+3. **Programmable Clock Divider / Speed Controller** (Memory-mapped peripheral at address `9`)
+4. **Dedicated Parallel Output Latch Array** (Memory-mapped peripheral at address `12` / `0xC`)
 
 ---
 
-## Unified SoC Address Mapping Matrix
+## Feature Architecture
 
-| Bit Address (Operand) | Target Subsystem | Operational Behavior |
-| :--- | :--- | :--- |
-| **`4'h0` to `4'h7`** | **Internal Scratchpad RAM** | General-purpose read/write data memory storage cells. |
-| **`4'h8` to `4'hF`** | **Parallel Input Port** | Read-only access to physical external pins **`ui_in[7:0]`**. |
-| **`4'h0` to `4'h7`** *(on STO/STOC)* | **Parallel Output Port** | Write-only latch routing straight to physical pins **`uo_out[7:0]`**. |
+### Integrated Peripherals
 
----
-
-## Automated Verification Workflows
-
-The verification suite splits its pipeline tasks to guarantee absolute behavioral correctness and structural layout integrity before submission.
-
-### 1. Behavior RTL Simulation Loop
-Driven locally or remotely by a Python-based `cocotb` test harness. 
-* Navigate terminal focus into the verification folder: `cd test`
-* Clean and fire up the simulation environment: `make clean && make`
-
-The test framework configures a stable 50 MHz clock line, asserts a master reset sequence, injects binary vectors into the parallel inputs, and validates that processing output transitions line up with the embedded ROM sequence.
-
-### 2. Gate-Level Netlist (GL) Layout Hardening
-When OpenLane finishes layout compilation, a Gate-Level simulation (`GATES=yes`) verifies the synthesized netlist cells against the physical IHP standard cell simulation libraries.
-
-* **Tooling Fix Note:** Because the IHP PDK simulation model files (`sg13g2_stdcell.v`) use advanced edge-sensitive timing rules wrapped inside `ifnone` constructs, standard open-source tools like Icarus Verilog v12 will crash. 
-* To fix this once and for all, the automated **`.github/workflows/gds.yaml`** configuration passes the argument **`IVVP_ARGS: "-gno-specify"`** directly into the testing container. This strips the broken timing parameters out, linking all **146 logic cells** together for a clean pass.
+| RAM Address | Function / Register | Description |
+|---|---|---|
+| `0x0` – `0x7` | General Purpose Registers | Read/Write single-bit internal storage registers. |
+| `0x8` | Single-Bit Edge Detector | Captures rising edges on `ui_in[0]`. Clear flag by writing `1`. |
+| `0x9` | Clock Divider Control | Sets execution step speed (1 = slow clock mode, 0 = full speed). |
+| `0xC` | 8-Bit Output Latch Array | Bitwise dynamic shift latch driving hardware output port `uo_out`. |
+| `0xD` – `0xF` | System Inputs | Direct read access to hardware input pins `ui_in[7:0]`. |
 
 ---
 
-## Physical ASIC Configuration Properties
-* **Process Technology Node:** IHP 130 nm BiCMOS (SG13G2)
-* **Layout Budget Footprint Allocation:** 3x2 Standard Macro Tiles
-* **Total Logic Gates Count:** 146 Cell Blocks
-* **Target Operational Frequency:** 50 MHz
-* **Top-Level Interface Module Name:** `tt_um_mc14500b_soc_extended`
+## Technical Specifications & Physical Design
+
+* **Process Node:** IHP SG13G2 (130 nm)
+* **Tile Size:** $1 \times 2$ Block
+* **Total Cell Count:** 2,810 standard cells (excluding fill/decap cells)
+* **Standard Cell Placement Utilization:** 77.59%
+* **Total Routing Wire Length:** 142,821 µm
+* **Supported Clock Frequencies:** Full system speed up to PDK target limits with flexible internal slow-step control.
+
+---
+
+## Pinout Map
+
+| Pin | Type | Name | Function |
+|---|---|---|---|
+| `ui_in[7:0]` | Input | Parallel Data / Instructions | Instruction byte in Program Mode / General inputs in Run Mode. |
+| `uo_out[7:0]` | Output | Parallel Output Latch Array | Hardware output pins connected to peripheral register `0xC`. |
+| `uio_in[5:0]` | Input | Program Address | Program Counter write target address during programming mode. |
+| `uio_in[6]` | Input | Program Write Enable | Pulse high to write byte `ui_in` into `prog_memory[uio_in[5:0]]`. |
+| `uio_in[7]` | Input | Program Mode Select | High = Dynamic Instruction Write Mode; Low = Execution Mode. |
+| `uio_out[5:0]`| Output | Program Counter (PC) | Real-time 6-bit instruction pointer monitor. |
+| `uio_out[7]` | Output | Write Enable Monitor | Real-time execution write enable monitor flag. |
+
+---
+
+## Quick Start & Verification
+
+### Running Tests
+To execute functional cocotb simulation tests:
+```bash
+cd test
+make
