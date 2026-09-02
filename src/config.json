@@ -13,26 +13,23 @@
 
   "//": "PL_TARGET_DENSITY_PCT - You can increase this if Global Placement fails with error GPL-0302.",
   "//": "Users have reported that values up to 80 worked well for them.",
- // "PL_TARGET_DENSITY_PCT": 55,
+  "PL_TARGET_DENSITY_PCT": 65,
 
   "PL_RESIZER_DESIGN_OPTIMIZATIONS": 0,
   "GLB_RESIZER_DESIGN_OPTIMIZATIONS": 0,
   "PL_RESIZER_MAX_FANOUT": 16,
-  "PL_RESIZER_HOLD_SLACK_MARGIN": 0,
-  "GRT_RESIZER_HOLD_SLACK_MARGIN": 0,
-  "PL_RESIZER_ALLOW_HOLD_VIOLATIONS": 1,
-  "PL_TARGET_DENSITY_PCT": 65,
 
   "GRT_ADJUSTMENT": 0.25,
   "SYNTH_STRATEGY": "AREA 1",
 
   "//": "CLOCK_PERIOD - Increase this in case you are getting setup time violations.",
-  "//": "The value is in nanoseconds, so 20ns == 50MHz.",
-  "CLOCK_PERIOD": 20,
+  "//": "The value is in nanoseconds, so 50ns == 20MHz.",
+  "CLOCK_PERIOD": 50,
 
-  "//": "Hold slack margin - Increase them in case you are getting hold violations.",
- // "PL_RESIZER_HOLD_SLACK_MARGIN": 0.1,
-//  "GRT_RESIZER_HOLD_SLACK_MARGIN": 0.05,
+  "//": "Hold slack margin - Set to 0 to prevent excessive hold buffer insertion.",
+  "PL_RESIZER_HOLD_SLACK_MARGIN": 0,
+  "GRT_RESIZER_HOLD_SLACK_MARGIN": 0,
+  "PL_RESIZER_ALLOW_HOLD_VIOLATIONS": 1,
 
   "//": "RUN_LINTER, LINTER_INCLUDE_PDK_MODELS - Disabling the linter is not recommended!",
   "RUN_LINTER": 1,
@@ -43,10 +40,6 @@
   "CLOCK_PORT": "clk",
 
   "//": "Configuration docs: https://librelane.readthedocs.io/en/latest/reference/configuration.html",
-
-  "//": "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
-  "//": "!!! DO NOT CHANGE ANYTHING BELOW THIS POINT !!!",
-  "//": "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
 
   "//": "Save some time",
   "RUN_KLAYOUT_XOR": 0,
