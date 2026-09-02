@@ -106,7 +106,7 @@ module tt_um_mc14500b_soc_extended (
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             latched_uo_out <= 8'h00;
-        end else if (core_write_en && (operand == 4 me_hC)) begin
+        end else if (core_write_en && (operand == 4'hC)) begin
             latched_uo_out <= {latched_uo_out[6:0], core_data_out}; // Shift bit into Address 12
         end
     end
