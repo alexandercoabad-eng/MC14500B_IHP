@@ -174,51 +174,51 @@ module tt_um_mc14500b_soc_extended (
     // =========================================================================
     // 5. MC14500B Execution Core State Machine
     // =========================================================================
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            r_ext_out <= 8'h00;
-            pc        <= 6'b000000;
-            ram_bank  <= 16'h0000;
-            r_rr      <= 1'b0;
-            r_oen     <= 1'b1;
-            r_ien     <= 1'b1;
-            r_skip    <= 1'b0;
-        end else if (prog_mode) begin
-            pc <= 6'b000000;
-        end else if (cpu_clk_step && !breakpoint_hit) begin
-            pc <= pc + 1'b1;
-            r_ext_out <= ram_bank[7:0];
-            ram_bank[15:8] <= ui_in;
+    // always @(posedge clk or negedge rst_n) begin
+    //     if (!rst_n) begin
+    //         r_ext_out <= 8'h00;
+    //         pc        <= 6'b000000;
+    //         ram_bank  <= 16'h0000;
+    //         r_rr      <= 1'b0;
+    //         r_oen     <= 1'b1;
+    //         r_ien     <= 1'b1;
+    //         r_skip    <= 1'b0;
+    //     end else if (prog_mode) begin
+    //         pc <= 6'b000000;
+    //     end else if (cpu_clk_step && !breakpoint_hit) begin
+    //         pc <= pc + 1'b1;
+    //         r_ext_out <= ram_bank[7:0];
+    //         ram_bank[15:8] <= ui_in;
 
-            if (r_skip) begin
-                r_skip <= 1'b0;
-            end else begin
-                case (opcode)
-                    4'h0: ; // NOP0 / FLAG O
-                    4'h1: r_rr   <= actual_data;           // LD
-                    4'h2: r_rr   <= !actual_data;          // LDC
-                    4'h3: r_rr   <= r_rr & actual_data;    // AND
-                    4'h4: r_rr   <= r_rr & (!actual_data); // ANDC
-                    4'h5: r_rr   <= r_rr | actual_data;    // OR
-                    4'h6: r_rr   <= r_rr | (!actual_data); // ORC
-                    4'h7: r_rr   <= !(r_rr ^ actual_data); // XNOR
-                    4'h8: ;                                // STO
-                    4'h9: ;                                // STOC
-                    4'hA: r_ien  <= actual_data;           // IEN
-                    4'hB: r_oen  <= actual_data;           // OEN
-                    4'hC: ;                                // JMP
-                    4'hD: r_skip <= !r_rr;                 // RTN / SKZ
-                    4'hE: ;                                // SKZ
-                    4'hF: ;                                // NOPF / FLAG F
-                endcase
-            end
+    //         if (r_skip) begin
+    //             r_skip <= 1'b0;
+    //         end else begin
+    //             case (opcode)
+    //                 4'h0: ; // NOP0 / FLAG O
+    //                 4'h1: r_rr   <= actual_data;           // LD
+    //                 4'h2: r_rr   <= !actual_data;          // LDC
+    //                 4'h3: r_rr   <= r_rr & actual_data;    // AND
+    //                 4'h4: r_rr   <= r_rr & (!actual_data); // ANDC
+    //                 4'h5: r_rr   <= r_rr | actual_data;    // OR
+    //                 4'h6: r_rr   <= r_rr | (!actual_data); // ORC
+    //                 4'h7: r_rr   <= !(r_rr ^ actual_data); // XNOR
+    //                 4'h8: ;                                // STO
+    //                 4'h9: ;                                // STOC
+    //                 4'hA: r_ien  <= actual_data;           // IEN
+    //                 4'hB: r_oen  <= actual_data;           // OEN
+    //                 4'hC: ;                                // JMP
+    //                 4'hD: r_skip <= !r_rr;                 // RTN / SKZ
+    //                 4'hE: ;                                // SKZ
+    //                 4'hF: ;                                // NOPF / FLAG F
+    //             endcase
+    //         end
 
-            // Write to general RAM location (Operand 0 to 7)
-            if (core_write_en && (operand < 4'h8)) begin
-                ram_bank[operand] <= (opcode == 4'h9) ? !core_data_out : core_data_out;
-            end
-        end
-    end
+    //         // Write to general RAM location (Operand 0 to 7)
+    //         if (core_write_en && (operand < 4'h8)) begin
+    //             ram_bank[operand] <= (opcode == 4'h9) ? !core_data_out : core_data_out;
+    //         end
+    //     end
+    // end
 
     // =========================================================================
     // 6. Top-Level Port Assignments (Mapping Internal Logic to Tiny Tapeout Pins)
