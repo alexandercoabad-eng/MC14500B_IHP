@@ -221,17 +221,18 @@ module tt_um_mc14500b_soc_extended (
     end
 
     // =========================================================================
-    // 6. Pin Multiplexing & Output Routing
+    // 6. Top-Level Port Assignments (Mapping Internal Logic to Tiny Tapeout Pins)
     // =========================================================================
-    // Parallel Outputs: [6:0] displays Latched array outputs; [7] outputs the Hardware PWM signal
+    
+    // Map outputs: [7] gets PWM, [6:0] gets lower 7 bits of latched_uo_out
     assign uo_out = {pwm_signal, latched_uo_out[6:0]};
 
-    // Extended Status Line Outputs on UIO
-    assign uio_out[5:0] = prog_mode ? 6'b000000 : pc;       
-    assign uio_out[6]   = prog_mode ? 1'b0 : breakpoint_hit; // High when PC hits breakpoint address
-    assign uio_out[7]   = prog_mode ? 1'b0 : core_write_en;  
+    // Mapping bidirectional pins (uio) for status feedback
+    // [5:0] exposes PC, [6] exposes core write enable, [7] exposes breakpoint flag
+    assign uio_out = {breakpoint_hit, core_write_en, pc};
     
-    // Dynamic Pin Directions: Input mode during Programming, Output mode during Run
-    assign uio_oe = prog_mode ? 8'b00000000 : 8'b11111111;   
-
+    // Set uio_oe pins to all outputs (1'b1) since they are dedicated status registers
+    // (Or route them dynamically depending on your specification)
+    assign uio_oe  = 8'b11111111;
+    
 endmodule
