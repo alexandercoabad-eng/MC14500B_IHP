@@ -1,37 +1,37 @@
 `default_nettype none
 
 module tt_um_mc14500b_soc_extended (
-    input  wire [7:0] ui_in,    // Run Mode: Parallel Input / Prog Mode: Instruction Byte
-    output wire [7:0] uo_out,   // Output Port ([6:0]=Latched/RAM outputs, [7]=Hardware PWM Output)
-    input  wire [7:0] uio_in,   // [7]=prog_mode, [6]=prog_we, [5:0]=prog_addr
-    output wire [7:0] uio_out,  // Status outputs: [5:0]=PC, [7]=Write Enable
-    output wire [7:0] uio_oe,   // Dynamic IO direction control
-    input  wire       ena,      // Tiny Tapeout project enable
-    input  wire       clk,      // System clock
-    input  wire       rst_n     // Active-low reset
+    input  wire [7:0] ui_in,    // Parallel Input Byte (Run Mode) / Instruction Byte (Prog Mode)
+    output wire [7:0] uo_out,   // Parallel Latched Outputs
+    input  wire [7:0] uio_in,   // Control Inputs: [7]=prog_mode, [6]=prog_we, [5:0]=prog_addr
+    output wire [7:0] uio_out,  // Status Outputs: [5:0]=PC, [7]=Write Enable
+    output wire [7:0] uio_oe,   // Dynamic IO Direction Control
+    input  wire       ena,      // Tiny Tapeout Enable Pin
+    input  wire       clk,      // System Clock
+    input  wire       rst_n     // Active-Low Reset
 );
 
-    // Suppress unused signal warning for Verilator
+    // Suppress unused signal warnings for Verilator
     wire _unused_ok = &{1'b0, ena, 1'b0};
 
     // =========================================================================
-    // 1. Memory and Programming Registers
+    // 1. Core Memory and Control Registers
     // =========================================================================
-    reg [7:0] prog_memory [0:63]; // 64-Byte Program RAM
-    reg [15:0] ram_bank;          // Registers 0-7: Local RAM, 8-15: Peripheral Map
+    reg [7:0] prog_memory [0:63]; // 64-Byte Instruction Memory
+    reg [15:0] ram_bank;          // Registers 0-7: General RAM, 8-15: Peripherals
     reg [5:0]  pc;                // Program Counter
 
-    // Programming Signals
+    // Program Execution / Configuration Signals
     wire prog_mode = uio_in[7];
     wire prog_we   = uio_in[6];
-    wire [5:0] prog_addr = uio_in[5:0]; 
+    wire [5:0] prog_addr = uio_in[5:0];
 
-    // Core Instruction Decoding
+    // Instruction Decoding
     wire [7:0] current_instruction = prog_memory[pc];
     wire [3:0] opcode  = current_instruction[7:4];
     wire [3:0] operand = current_instruction[3:0];
 
-    // Core Execution Signals
+    // Execution Core Signals
     wire core_data_in;
     wire core_rr;
     wire core_write_en;
@@ -42,29 +42,11 @@ module tt_um_mc14500b_soc_extended (
     wire actual_data = core_data_in & r_ien;
 
     // =========================================================================
-    // 2. Hardware Extensions & Peripheral Registers (3 Features + Base PWM)
+    // 2. Feature 1: Compact Clock Divider
     // =========================================================================
-    
-    // --- Feature 1: Edge Detector on ui_in[0] ---
-    reg ui_in0_d;
-    reg edge_flag;
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            ui_in0_d  <= 1'b0;
-            edge_flag <= 1'b0;
-        end else begin
-            ui_in0_d <= ui_in[0];
-            if (ui_in[0] && !ui_in0_d) begin
-                edge_flag <= 1'b1; // Latch rising edge
-            end else if (core_write_en && (operand == 4'h8) && core_data_out) begin
-                edge_flag <= 1'b0; // Clear on writing 1 to RAM index 8
-            end
-        end
-    end
-
-    // --- Feature 2: Compact Clock Divider ---
     reg [11:0] slow_counter;
     reg        use_slow_clk;
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             slow_counter <= 12'd0;
@@ -72,67 +54,47 @@ module tt_um_mc14500b_soc_extended (
         end else begin
             slow_counter <= slow_counter + 1'b1;
             if (core_write_en && (operand == 4'h9)) begin
-                use_slow_clk <= core_data_out; // Address 9 toggles slow mode
+                use_slow_clk <= core_data_out; // Address 9 sets clock rate flag
             end
         end
     end
+
     wire cpu_clk_step = use_slow_clk ? (slow_counter == 12'd0) : 1'b1;
 
-    // --- Feature 3: Dedicated Bit-Addressable Output Latch Array ---
+    // =========================================================================
+    // 3. Feature 2: Dedicated Bit-Addressable Output Latch Array
+    // =========================================================================
     reg [7:0] latched_uo_out;
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             latched_uo_out <= 8'h00;
         end else if (core_write_en && (operand == 4'hC)) begin
-            latched_uo_out <= {latched_uo_out[6:0], core_data_out}; // Shift bit into Address 12
+            latched_uo_out <= {latched_uo_out[6:0], core_data_out}; // Shift output bit at Address 12
         end
     end
-
-    // --- Base Feature: 8-Bit Hardware PWM Generator ---
-    reg [7:0] pwm_counter;
-    reg [7:0] pwm_duty_cycle;
-    wire      pwm_signal;
-
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            pwm_counter <= 8'h00;
-        end else begin
-            pwm_counter <= pwm_counter + 1'b1;
-        end
-    end
-
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            pwm_duty_cycle <= 8'h00;
-        end else if (core_write_en && (operand == 4'hF)) begin
-            pwm_duty_cycle <= {pwm_duty_cycle[6:0], core_data_out}; // Shift bit into Address 15
-        end
-    end
-
-    assign pwm_signal = (pwm_counter < pwm_duty_cycle);
 
     // =========================================================================
-    // 3. Extended RAM Read Data Multiplexing
+    // 4. Memory Bus Data Multiplexing
     // =========================================================================
     wire [15:0] mapped_ram_bank;
     assign mapped_ram_bank[7:0]   = ram_bank[7:0];
-    assign mapped_ram_bank[8]     = edge_flag;       // Read edge flag state
-    assign mapped_ram_bank[9]     = use_slow_clk;    // Read clock mode status
-    assign mapped_ram_bank[11:10] = 2'b00;           // Reserved
-    assign mapped_ram_bank[12]    = latched_uo_out[0];
-    assign mapped_ram_bank[14:13] = ram_bank[14:13];
-    assign mapped_ram_bank[15]    = pwm_signal;
+    assign mapped_ram_bank[8]     = 1'b0;            // Unused space
+    assign mapped_ram_bank[9]     = use_slow_clk;    // Feature 1 readback
+    assign mapped_ram_bank[11:10] = 2'b00;
+    assign mapped_ram_bank[12]    = latched_uo_out[0]; // Feature 2 readback
+    assign mapped_ram_bank[15:13] = ram_bank[15:13];
 
     assign core_data_in  = mapped_ram_bank[operand];
     assign core_rr       = r_rr;
     assign core_data_out = r_rr;
-    
-    // Core Write Enable Calculation
+
+    // Core Write Enable Output
     assign core_write_en = (!prog_mode) && (!r_skip) && r_oen && 
                            ((opcode == 4'h8) || (opcode == 4'h9));
 
     // =========================================================================
-    // 4. Synchronous Program Memory Writes
+    // 5. Instruction RAM Dynamic Write Interface
     // =========================================================================
     integer i;
     always @(posedge clk or negedge rst_n) begin
@@ -146,7 +108,7 @@ module tt_um_mc14500b_soc_extended (
     end
 
     // =========================================================================
-    // 5. MC14500B Execution Core State Machine
+    // 6. MC14500B Core Logic Execution Pipeline
     // =========================================================================
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -185,7 +147,7 @@ module tt_um_mc14500b_soc_extended (
                 endcase
             end
 
-            // Write to general RAM location (Operand 0 to 7)
+            // Save bit logic to register addresses 0..7
             if (core_write_en && (operand < 4'h8)) begin
                 ram_bank[operand] <= (opcode == 4'h9) ? !core_data_out : core_data_out;
             end
@@ -193,10 +155,10 @@ module tt_um_mc14500b_soc_extended (
     end
 
     // =========================================================================
-    // 6. Pin Multiplexing & Output Routing
+    // 7. Output Signal Assignments
     // =========================================================================
-    assign uo_out  = {pwm_signal, latched_uo_out[6:0]};
+    assign uo_out  = latched_uo_out;
     assign uio_out = prog_mode ? 8'h00 : {core_write_en, 1'b0, pc};
-    assign uio_oe  = prog_mode ? 8'b00000000 : 8'b11111111;   
+    assign uio_oe  = prog_mode ? 8'b00000000 : 8'b11111111;
 
 endmodule
