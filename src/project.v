@@ -11,6 +11,9 @@ module tt_um_mc14500b_soc_extended (
     input  wire       rst_n     // Active-low reset
 );
 
+    // Suppress unused signal warning for Verilator
+    wire _unused_ok = &{1'b0, ena, 1'b0};
+
     // =========================================================================
     // 1. Memory and Programming Registers
     // =========================================================================
@@ -39,7 +42,7 @@ module tt_um_mc14500b_soc_extended (
     wire actual_data = core_data_in & r_ien;
 
     // =========================================================================
-    // 2. Hardware Extensions & Peripheral Registers
+    // 2. Hardware Extensions & Peripheral Registers (3 Features + Base PWM)
     // =========================================================================
     
     // --- Feature 1: Edge Detector on ui_in[0] ---
@@ -75,20 +78,7 @@ module tt_um_mc14500b_soc_extended (
     end
     wire cpu_clk_step = use_slow_clk ? (slow_counter == 12'd0) : 1'b1;
 
-    // --- Feature 3: Hardware Countdown Timer ---
-    reg [7:0] timer_count;
-    wire      timer_expired = (timer_count == 8'h00);
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            timer_count <= 8'h00;
-        end else if (core_write_en && (operand == 4'hA)) begin
-            timer_count <= {timer_count[6:0], core_data_out}; // Shift bit into Address 10
-        end else if (!timer_expired && cpu_clk_step) begin
-            timer_count <= timer_count - 1'b1;
-        end
-    end
-
-    // --- Feature 4: Dedicated Bit-Addressable Output Latch Array ---
+    // --- Feature 3: Dedicated Bit-Addressable Output Latch Array ---
     reg [7:0] latched_uo_out;
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -128,8 +118,7 @@ module tt_um_mc14500b_soc_extended (
     assign mapped_ram_bank[7:0]   = ram_bank[7:0];
     assign mapped_ram_bank[8]     = edge_flag;       // Read edge flag state
     assign mapped_ram_bank[9]     = use_slow_clk;    // Read clock mode status
-    assign mapped_ram_bank[10]    = timer_expired;   // Read 1 if timer hit zero
-    assign mapped_ram_bank[11]    = 1'b0;            // Reserved
+    assign mapped_ram_bank[11:10] = 2'b00;           // Reserved
     assign mapped_ram_bank[12]    = latched_uo_out[0];
     assign mapped_ram_bank[14:13] = ram_bank[14:13];
     assign mapped_ram_bank[15]    = pwm_signal;
