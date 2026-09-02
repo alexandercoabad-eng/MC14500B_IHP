@@ -1,4 +1,4 @@
- va`default_nettype none
+`default_nettype none
 
 module tt_um_mc14500b_soc_extended (
     input  wire [7:0] ui_in,    // Run Mode: Parallel Input / Prog Mode: Instruction Byte
@@ -129,7 +129,7 @@ module tt_um_mc14500b_soc_extended (
     assign mapped_ram_bank[8]     = edge_flag;       // Read edge flag state
     assign mapped_ram_bank[9]     = use_slow_clk;    // Read clock mode status
     assign mapped_ram_bank[10]    = timer_expired;   // Read 1 if timer hit zero
-    assign mapped_ram_bank[11]    = 1'b0;            // Reserved (Breakpoint Removed)
+    assign mapped_ram_bank[11]    = 1'b0;            // Reserved
     assign mapped_ram_bank[12]    = latched_uo_out[0];
     assign mapped_ram_bank[14:13] = ram_bank[14:13];
     assign mapped_ram_bank[15]    = pwm_signal;
@@ -206,13 +206,8 @@ module tt_um_mc14500b_soc_extended (
     // =========================================================================
     // 6. Pin Multiplexing & Output Routing
     // =========================================================================
-    // Parallel Outputs: [6:0] displays Latched array outputs; [7] outputs the Hardware PWM signal
-    assign uo_out = {pwm_signal, latched_uo_out[6:0]};
-
-    // Extended Status Line Outputs on UIO ([7]=Write Enable, [6]=Reserved, [5:0]=PC)
+    assign uo_out  = {pwm_signal, latched_uo_out[6:0]};
     assign uio_out = prog_mode ? 8'h00 : {core_write_en, 1'b0, pc};
-    
-    // Dynamic Pin Directions: Input mode during Programming, Output mode during Run
     assign uio_oe  = prog_mode ? 8'b00000000 : 8'b11111111;   
 
 endmodule
