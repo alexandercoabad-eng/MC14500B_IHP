@@ -13,8 +13,18 @@
 
   "//": "PL_TARGET_DENSITY_PCT - You can increase this if Global Placement fails with error GPL-0302.",
   "//": "Users have reported that values up to 80 worked well for them.",
-  "PL_TARGET_DENSITY_PCT": 80,
+  "PL_TARGET_DENSITY_PCT": 55,
 
+
+ 
+  "PL_RESIZER_DESIGN_OPTIMIZATIONS": 0,
+  "GLB_RESIZER_DESIGN_OPTIMIZATIONS": 0,
+  "PL_RESIZER_MAX_FANOUT": 16,
+
+  "GRT_ADJUSTMENT": 0.25,
+  "SYNTH_STRATEGY": "AREA 1"
+
+  
   "//": "CLOCK_PERIOD - Increase this in case you are getting setup time violations.",
   "//": "The value is in nanoseconds, so 20ns == 50MHz.",
   "CLOCK_PERIOD": 20,
