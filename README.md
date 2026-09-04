@@ -123,7 +123,7 @@ When OpenLane/LibreLane finishes layout compilation, a Gate-Level simulation (`G
 ## Physical ASIC Configuration Properties
 * **Process Technology Node:** IHP 130 nm BiCMOS (SG13G2)
 * **Layout Footprint Allocation:** $1 \times 2$ Block
-* **Total Logic Cell Count:** 2,697 Cells (excluding fill and decap cells)
-* **Standard Cell Placement Utilization:** ~78.2%
-* **Total Routing Wire Length:** 134,443 µm
+* **Total Logic Cell Count:** 2,662 Cells (excluding fill and decap cells)
+* **Standard Cell Placement Utilization:** ~78.1%
+* **Total Routing Wire Length:** 137,557 µm
 * **Top-Level Interface Module Name:** `tt_um_mc14500b_soc_extended`
