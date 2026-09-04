@@ -2,9 +2,9 @@
 
 # MC14500B Extended 1-bit Microcontroller SoC
 
-An advanced, self-contained 1-bit Microcontroller System on Chip (SoC) centered around a hardened clone of the iconic 1977 Motorola MC14500B Industrial Control Unit (ICU). This layout occupies a **1x2 tile footprint**[cite: 1] and is target-hardened specifically for the **TTIHP (IHP 130 nm BiCMOS SG13G2)** open-source silicon shuttle run[cite: 1, 2].
+An advanced, self-contained 1-bit Microcontroller System on Chip (SoC) centered around a hardened clone of the iconic 1977 Motorola MC14500B Industrial Control Unit (ICU). This layout occupies a **1x2 tile footprint** and is target-hardened specifically for the **TTIHP (IHP 130 nm BiCMOS SG13G2)** open-source silicon shuttle run.
 
-Unlike a standalone CPU core, this macro design integrates a dynamic 64-byte program memory, static scratchpad registers, hardware-mapped peripherals (edge detector, clock divider, output latch array), and dedicated parallel I/O port interfaces directly into a single piece of silicon containing **2,810 standard cells** (excluding fill and decap cells)[cite: 2].
+Unlike a standalone CPU core, this macro design integrates a dynamic 64-byte program memory, static scratchpad registers, hardware-mapped peripherals (edge detector, clock divider, output latch array), and dedicated parallel I/O port interfaces directly into a single piece of silicon containing **2,810 standard cells** (excluding fill and decap cells).
 
 ---
 
@@ -38,7 +38,7 @@ This design extends the classic 1-bit Motorola architecture into a fully autonom
 
 ## Automated Verification Workflows
 
-The verification suite splits its pipeline tasks to guarantee absolute behavioral correctness and structural layout integrity before submission[cite: 2].
+The verification suite splits its pipeline tasks to guarantee absolute behavioral correctness and structural layout integrity before submission.
 
 ### 1. Behavioral RTL Simulation Loop
 Driven locally or remotely by a Python-based `cocotb` test harness. 
@@ -48,17 +48,17 @@ Driven locally or remotely by a Python-based `cocotb` test harness.
 The test framework configures a stable clock line, asserts a master reset sequence, injects binary vectors into the parallel inputs, loads instructions via dynamic programming mode, and validates output transitions.
 
 ### 2. Gate-Level Netlist (GL) Layout Hardening
-When OpenLane/LibreLane finishes layout compilation, a Gate-Level simulation (`GATES=yes`) verifies the synthesized netlist cells against the physical IHP standard cell simulation libraries[cite: 2].
+When OpenLane/LibreLane finishes layout compilation, a Gate-Level simulation (`GATES=yes`) verifies the synthesized netlist cells against the physical IHP standard cell simulation libraries.
 
 * **Tooling Fix Note:** Because the IHP PDK simulation model files (`sg13g2_stdcell.v`) use advanced edge-sensitive timing rules wrapped inside `ifnone` constructs, standard open-source tools like Icarus Verilog v12 will crash. 
-* To resolve this, the automated **`.github/workflows/gds.yaml`** configuration passes the argument **`IVVP_ARGS: "-gno-specify"`** directly into the testing container. This bypasses timing parameters, linking all standard cells together for a clean pass[cite: 2].
+* To resolve this, the automated **`.github/workflows/gds.yaml`** configuration passes the argument **`IVVP_ARGS: "-gno-specify"`** directly into the testing container. This bypasses timing parameters, linking all standard cells together for a clean pass.
 
 ---
 
 ## Physical ASIC Configuration Properties
-* **Process Technology Node:** IHP 130 nm BiCMOS (SG13G2)[cite: 1, 2]
-* **Layout Footprint Allocation:** $1 \times 2$ Block[cite: 1]
-* **Total Logic Cell Count:** 2,810 Cells (excluding fill and decap cells)[cite: 2]
-* **Standard Cell Placement Utilization:** ~77.6%[cite: 2]
-* **Total Routing Wire Length:** 142,821 µm[cite: 2]
+* **Process Technology Node:** IHP 130 nm BiCMOS (SG13G2)
+* **Layout Footprint Allocation:** $1 \times 2$ Block
+* **Total Logic Cell Count:** 2,810 Cells (excluding fill and decap cells)
+* **Standard Cell Placement Utilization:** ~77.6%
+* **Total Routing Wire Length:** 142,821 µm
 * **Top-Level Interface Module Name:** `tt_um_mc14500b_soc_extended`
