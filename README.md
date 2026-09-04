@@ -7,9 +7,9 @@ An advanced, self-contained 1-bit Microcontroller System on Chip (SoC) centered 
 Unlike a standalone CPU core, this macro design integrates a dynamic 64-byte program memory, static scratchpad registers, hardware-mapped peripherals (edge detector, clock divider, output latch array), and dedicated parallel I/O port interfaces directly into a single piece of silicon containing **2,697 standard cells** (excluding fill and decap cells).
 
 ---
-# Layout
+## Layout
 
-<img width="420" height="641" alt="Screenshot 2026-09-04 at 12 02 24 PM" src="https://github.com/user-attachments/assets/b43d40a4-055c-415f-aff5-3219e085dcea" />
+<img width="420" height="641" alt="Screenshot 2026-09-04 at 12 02 24 PM" src="https://github.com/user-attachments/assets/58a1a0f5-d33d-40aa-8e01-01c5333644f5" />
 
 ---
 
