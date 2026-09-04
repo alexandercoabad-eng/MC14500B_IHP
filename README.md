@@ -4,7 +4,12 @@
 
 An advanced, self-contained 1-bit Microcontroller System on Chip (SoC) centered around a hardened clone of the iconic 1977 Motorola MC14500B Industrial Control Unit (ICU). This layout occupies a **1x2 tile footprint** and is target-hardened specifically for the **TTIHP (IHP 130 nm BiCMOS SG13G2)** open-source silicon shuttle run.
 
-Unlike a standalone CPU core, this macro design integrates a dynamic 64-byte program memory, static scratchpad registers, hardware-mapped peripherals (edge detector, clock divider, output latch array), and dedicated parallel I/O port interfaces directly into a single piece of silicon containing **2,810 standard cells** (excluding fill and decap cells).
+Unlike a standalone CPU core, this macro design integrates a dynamic 64-byte program memory, static scratchpad registers, hardware-mapped peripherals (edge detector, clock divider, output latch array), and dedicated parallel I/O port interfaces directly into a single piece of silicon containing **2,697 standard cells** (excluding fill and decap cells).
+
+---
+## Layout
+
+<img width="420" height="641" alt="Screenshot 2026-09-04 at 12 02 24 PM" src="https://github.com/user-attachments/assets/1143a461-c947-47a9-9af9-1b8577ecd452" />
 
 ---
 
@@ -25,14 +30,34 @@ This design extends the classic 1-bit Motorola architecture into a fully autonom
 
 ## Unified SoC Address Mapping Matrix
 
+> **Note:** addresses `4'h8`-`4'hF` are **not** a uniform input port. Only three of
+> those eight addresses (`4'hD`/`4'hE`/`4'hF`) tap the physical input pins, and each
+> exposes exactly one bit — not the full `ui_in[7:0]` byte. `4'h8`, `4'h9`, and `4'hC`
+> are dedicated peripheral registers, and `4'hA`-`4'hB` are hard-wired to `0`.
+
 | Bit Address (Operand) | Target Subsystem | Operational Behavior |
 | :--- | :--- | :--- |
 | **`4'h0` to `4'h7`** | **Internal Scratchpad RAM** | General-purpose read/write single-bit data registers. |
 | **`4'h8`** | **Rising Edge Detector** | Read edge flag status; write `1` to clear flag. |
 | **`4'h9`** | **Clock Divider Control** | Read/write execution speed mode (1 = slow clock step, 0 = full speed). |
-| **`4'hA` to `4'hB`** | **Reserved / Unused** | Reserved space. |
+| **`4'hA` to `4'hB`** | **Hard-Wired Zero** | Always reads `0`; writes have no effect. |
 | **`4'hC`** | **Output Latch Array** | Bitwise shift-in write access driving `uo_out[7:0]`. |
-| **`4'hD` to `4'hF`** | **Parallel Input Port** | Read-only access to physical external pins **`ui_in[7:0]`**. |
+| **`4'hD`** | **Input Tap** | Read-only, one-cycle-delayed view of **`ui_in[5]`**. |
+| **`4'hE`** | **Input Tap** | Read-only, one-cycle-delayed view of **`ui_in[6]`**. |
+| **`4'hF`** | **Input Tap** | Read-only, one-cycle-delayed view of **`ui_in[7]`**. |
+
+`ui_in[4:0]` are not directly addressable by the core at all; only the top three
+input bits are latched and exposed as scratch-readable state.
+
+### Peripheral Write Timing Under the Clock Divider
+
+Writes to the peripheral registers (`4'h8`, `4'h9`, `4'hC`, and general-purpose
+`4'h0`-`4'h7`) fire **exactly once**, on the first real clock edge after the
+instruction becomes current — independent of `cpu_clk_step`. This matters once the
+clock divider (`4'h9`) parks the CPU on a `STO`/`STOC` instruction for many physical
+clock cycles: the write commits immediately and then holds steady, rather than
+either re-firing on every physical edge or being delayed until the divider's next
+pulse.
 
 ---
 
@@ -58,7 +83,7 @@ When OpenLane/LibreLane finishes layout compilation, a Gate-Level simulation (`G
 ## Physical ASIC Configuration Properties
 * **Process Technology Node:** IHP 130 nm BiCMOS (SG13G2)
 * **Layout Footprint Allocation:** $1 \times 2$ Block
-* **Total Logic Cell Count:** 2,810 Cells (excluding fill and decap cells)
-* **Standard Cell Placement Utilization:** ~77.6%
-* **Total Routing Wire Length:** 142,821 µm
+* **Total Logic Cell Count:** 2,697 Cells (excluding fill and decap cells)
+* **Standard Cell Placement Utilization:** ~78.2%
+* **Total Routing Wire Length:** 134,443 µm
 * **Top-Level Interface Module Name:** `tt_um_mc14500b_soc_extended`
