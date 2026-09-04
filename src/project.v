@@ -20,6 +20,8 @@ module tt_um_mc14500b_soc_extended (
     reg [7:0] prog_memory [0:63]; // 64-Byte Instruction Memory
     reg [15:0] ram_bank;          // Registers 0-7: General RAM, 8-15: Peripherals
     reg [5:0]  pc;                // Program Counter
+    reg        instr_exec_done;   // Has the currently-fetched instruction already
+                                   // fired its (one-shot) execution/write effects?
 
     // Program Execution / Configuration Signals
     wire prog_mode = uio_in[7];
@@ -62,8 +64,10 @@ module tt_um_mc14500b_soc_extended (
             ui_in0_d <= ui_in[0];
             if (ui_in[0] && !ui_in0_d) begin
                 edge_flag <= 1'b1; // Detect and latch rising edge (always live, independent of CPU stepping)
-            end else if (cpu_clk_step && core_write_en && (operand == 4'h8) && effective_write_data) begin
-                edge_flag <= 1'b0; // Clear flag on writing 1 to RAM address 8, once per CPU step
+            end else if (!instr_exec_done && core_write_en && (operand == 4'h8) && effective_write_data) begin
+                edge_flag <= 1'b0; // Clear flag on writing 1 to RAM address 8, once per instruction (not
+                                    // re-gated by cpu_clk_step, so it fires exactly once even while the
+                                    // clock divider parks the CPU on this instruction for many cycles)
             end
         end
     end
@@ -80,8 +84,9 @@ module tt_um_mc14500b_soc_extended (
             use_slow_clk <= 1'b0;
         end else begin
             slow_counter <= slow_counter + 1'b1; // free-running; must NOT be gated by cpu_clk_step
-            if (cpu_clk_step && core_write_en && (operand == 4'h9)) begin
-                use_slow_clk <= effective_write_data; // Address 9 toggles slow execution, once per CPU step
+            if (!instr_exec_done && core_write_en && (operand == 4'h9)) begin
+                use_slow_clk <= effective_write_data; // Address 9 toggles slow execution, once per
+                                                        // instruction, independent of cpu_clk_step
             end
         end
     end
@@ -96,8 +101,11 @@ module tt_um_mc14500b_soc_extended (
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             latched_uo_out <= 8'h00;
-        end else if (cpu_clk_step && core_write_en && (operand == 4'hC)) begin
-            latched_uo_out <= {latched_uo_out[6:0], effective_write_data}; // Shift bit into Address 12, once per CPU step
+        end else if (!instr_exec_done && core_write_en && (operand == 4'hC)) begin
+            latched_uo_out <= {latched_uo_out[6:0], effective_write_data}; // Shift bit into Address 12, once
+                                                                            // per instruction, independent of
+                                                                            // cpu_clk_step (fires exactly once
+                                                                            // even while parked by the divider)
         end
     end
 
@@ -139,44 +147,64 @@ module tt_um_mc14500b_soc_extended (
     // =========================================================================
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            pc        <= 6'b000000;
-            ram_bank  <= 16'h0000;
-            r_rr      <= 1'b0;
-            r_oen     <= 1'b1;
-            r_ien     <= 1'b1;
-            r_skip    <= 1'b0;
+            pc              <= 6'b000000;
+            ram_bank        <= 16'h0000;
+            r_rr            <= 1'b0;
+            r_oen           <= 1'b1;
+            r_ien           <= 1'b1;
+            r_skip          <= 1'b0;
+            instr_exec_done <= 1'b0;
         end else if (prog_mode) begin
-            pc <= 6'b000000;
-        end else if (cpu_clk_step) begin
-            pc <= pc + 1'b1;
-            ram_bank[15:8] <= ui_in;
+            pc              <= 6'b000000;
+            instr_exec_done <= 1'b0;
+        end else begin
+            // Execute the currently-fetched instruction's effects (ALU update,
+            // r_skip/r_ien/r_oen updates, and scratch-RAM writes) exactly once,
+            // on the first real clock edge after it becomes current. This is
+            // intentionally decoupled from cpu_clk_step: gating execution on
+            // cpu_clk_step would either re-run the same STO/STOC on every
+            // physical edge while the clock divider parks the CPU (if
+            // core_write_en weren't cpu_clk_step-qualified) or delay the write
+            // until the divider's next pulse, up to ~4096 cycles later (if it
+            // were). Instead we fire once immediately and then hold.
+            if (!instr_exec_done) begin
+                if (r_skip) begin
+                    r_skip <= 1'b0;
+                end else begin
+                    case (opcode)
+                        4'h0: ;                                // NOP0
+                        4'h1: r_rr   <= actual_data;           // LD
+                        4'h2: r_rr   <= !actual_data;          // LDC
+                        4'h3: r_rr   <= r_rr & actual_data;    // AND
+                        4'h4: r_rr   <= r_rr & (!actual_data); // ANDC
+                        4'h5: r_rr   <= r_rr | actual_data;    // OR
+                        4'h6: r_rr   <= r_rr | (!actual_data); // ORC
+                        4'h7: r_rr   <= !(r_rr ^ actual_data); // XNOR
+                        4'h8: ;                                // STO
+                        4'h9: ;                                // STOC
+                        4'hA: r_ien  <= actual_data;           // IEN
+                        4'hB: r_oen  <= actual_data;           // OEN
+                        4'hC: ;                                // JMP
+                        4'hD: r_skip <= !r_rr;                 // RTN / SKZ
+                        4'hE: ;                                // SKZ
+                        4'hF: ;                                // NOPF
+                    endcase
+                end
 
-            if (r_skip) begin
-                r_skip <= 1'b0;
-            end else begin
-                case (opcode)
-                    4'h0: ;                                // NOP0
-                    4'h1: r_rr   <= actual_data;           // LD
-                    4'h2: r_rr   <= !actual_data;          // LDC
-                    4'h3: r_rr   <= r_rr & actual_data;    // AND
-                    4'h4: r_rr   <= r_rr & (!actual_data); // ANDC
-                    4'h5: r_rr   <= r_rr | actual_data;    // OR
-                    4'h6: r_rr   <= r_rr | (!actual_data); // ORC
-                    4'h7: r_rr   <= !(r_rr ^ actual_data); // XNOR
-                    4'h8: ;                                // STO
-                    4'h9: ;                                // STOC
-                    4'hA: r_ien  <= actual_data;           // IEN
-                    4'hB: r_oen  <= actual_data;           // OEN
-                    4'hC: ;                                // JMP
-                    4'hD: r_skip <= !r_rr;                 // RTN / SKZ
-                    4'hE: ;                                // SKZ
-                    4'hF: ;                                // NOPF
-                endcase
+                // Save bit logic to register addresses 0..7
+                if (core_write_en && (operand < 4'h8)) begin
+                    ram_bank[operand] <= effective_write_data;
+                end
+
+                instr_exec_done <= 1'b1;
             end
 
-            // Save bit logic to register addresses 0..7
-            if (core_write_en && (operand < 4'h8)) begin
-                ram_bank[operand] <= (opcode == 4'h9) ? !core_data_out : core_data_out;
+            // Advance to the next instruction only as fast as the (possibly
+            // divided-down) CPU clock step allows.
+            if (cpu_clk_step) begin
+                pc              <= pc + 1'b1;
+                ram_bank[15:8]  <= ui_in;
+                instr_exec_done <= 1'b0;
             end
         end
     end
