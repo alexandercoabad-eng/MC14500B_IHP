@@ -41,6 +41,13 @@ module tt_um_mc14500b_soc_extended (
     reg r_rr, r_oen, r_ien;
     wire actual_data = core_data_in & r_ien;
 
+    // The value STO/STOC actually intend to store: STOC (opcode 9) stores
+    // the complement of RR, STO (opcode 8) stores RR as-is. This must be
+    // used consistently by every write target (scratch RAM 0-7 *and* the
+    // three peripheral registers below) so STOC behaves the same way
+    // everywhere it's addressable.
+    wire effective_write_data = (opcode == 4'h9) ? !core_data_out : core_data_out;
+
     // =========================================================================
     // 2. Feature 1: Ultra-Lightweight Edge Detector on ui_in[0] (Address 8)
     // =========================================================================
@@ -54,9 +61,9 @@ module tt_um_mc14500b_soc_extended (
         end else begin
             ui_in0_d <= ui_in[0];
             if (ui_in[0] && !ui_in0_d) begin
-                edge_flag <= 1'b1; // Detect and latch rising edge
-            end else if (core_write_en && (operand == 4'h8) && core_data_out) begin
-                edge_flag <= 1'b0; // Clear flag on writing 1 to RAM address 8
+                edge_flag <= 1'b1; // Detect and latch rising edge (always live, independent of CPU stepping)
+            end else if (cpu_clk_step && core_write_en && (operand == 4'h8) && effective_write_data) begin
+                edge_flag <= 1'b0; // Clear flag on writing 1 to RAM address 8, once per CPU step
             end
         end
     end
@@ -72,9 +79,9 @@ module tt_um_mc14500b_soc_extended (
             slow_counter <= 12'd0;
             use_slow_clk <= 1'b0;
         end else begin
-            slow_counter <= slow_counter + 1'b1;
-            if (core_write_en && (operand == 4'h9)) begin
-                use_slow_clk <= core_data_out; // Address 9 toggles slow execution
+            slow_counter <= slow_counter + 1'b1; // free-running; must NOT be gated by cpu_clk_step
+            if (cpu_clk_step && core_write_en && (operand == 4'h9)) begin
+                use_slow_clk <= effective_write_data; // Address 9 toggles slow execution, once per CPU step
             end
         end
     end
@@ -89,8 +96,8 @@ module tt_um_mc14500b_soc_extended (
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             latched_uo_out <= 8'h00;
-        end else if (core_write_en && (operand == 4'hC)) begin
-            latched_uo_out <= {latched_uo_out[6:0], core_data_out}; // Shift bit into Address 12
+        end else if (cpu_clk_step && core_write_en && (operand == 4'hC)) begin
+            latched_uo_out <= {latched_uo_out[6:0], effective_write_data}; // Shift bit into Address 12, once per CPU step
         end
     end
 
