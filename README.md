@@ -7,9 +7,9 @@ An advanced, self-contained 1-bit Microcontroller System on Chip (SoC) centered 
 Unlike a standalone CPU core, this macro design integrates a dynamic 64-byte program memory, static scratchpad registers, hardware-mapped peripherals (edge detector, clock divider, output latch array), and dedicated parallel I/O port interfaces directly into a single piece of silicon containing **2,697 standard cells** (excluding fill and decap cells).
 
 ---
-## Layout
+# Layout
 
-<img width="420" height="641" alt="Screenshot 2026-09-04 at 12 02 24 PM" src="https://github.com/user-attachments/assets/1143a461-c947-47a9-9af9-1b8577ecd452" />
+<img width="420" height="641" alt="Screenshot 2026-09-04 at 12 02 24 PM" src="https://github.com/user-attachments/assets/b43d40a4-055c-415f-aff5-3219e085dcea" />
 
 ---
 
@@ -48,6 +48,9 @@ This design extends the classic 1-bit Motorola architecture into a fully autonom
 
 `ui_in[4:0]` are not directly addressable by the core at all; only the top three
 input bits are latched and exposed as scratch-readable state.
+
+For the full opcode-by-opcode reference (including a couple of places where the
+RTL's own comments don't match its behavior), see **[ISA.md](ISA.md)**.
 
 ### Peripheral Write Timing Under the Clock Divider
 
