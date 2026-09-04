@@ -75,6 +75,43 @@ Driven locally or remotely by a Python-based `cocotb` test harness.
 
 The test framework configures a stable clock line, asserts a master reset sequence, injects binary vectors into the parallel inputs, loads instructions via dynamic programming mode, and validates output transitions.
 
+The suite (`test/test.py`) currently runs **16 tests**, organized into three groups.
+These run identically against both the RTL simulation and the post-synthesis
+gate-level netlist (`gl_test` in CI).
+
+**Group 1 — Core functional behavior** (must pass before any tapeout):
+
+| Test | Verifies |
+| :--- | :--- |
+| `test_reset_state` | After reset, `pc = 0` and all outputs are zero. |
+| `test_program_counter_increments_and_wraps` | `pc` free-runs through all 64 words and wraps `63 → 0`. |
+| `test_program_mode_holds_pc_at_zero` | While `prog_mode = 1`, `pc` stays at `0` regardless of clock edges. |
+| `test_ld_reads_external_input_with_one_cycle_latency` | `LD` from address `0xF` reflects `ui_in[7]`, latched one clock late. |
+| `test_ldc_inverts_input` | `LDC` loads the complement of the addressed bit into `RR`. |
+| `test_scratch_ram_write_and_readback` | Registers `0x0`-`0x7` are independently read/write-able. |
+| `test_alu_truth_tables` | Directed truth-table coverage for `AND`/`ANDC`/`OR`/`ORC`/`XNOR`. |
+| `test_ien_gates_data_input` | `IEN` (opcode `0xA`) gates subsequent addressed reads to `0` when cleared. |
+| `test_oen_blocks_store` | `OEN` (opcode `0xB`) blocks `STO`/`STOC` writes when cleared. |
+| `test_skip_opcode_skips_exactly_one_instruction` | The skip-if-zero behavior on opcode `0xD` suppresses exactly the next instruction. |
+| `test_edge_detector_addr8` | A rising edge on `ui_in[0]` sets the edge flag, readable at `0x8`. |
+| `test_output_latch_shifts_msb_first_history` | Repeated `STO 0xC` calls build up an 8-bit MSB-first shift history in `uo_out`. |
+| `test_clock_divider_freezes_pc` | Enabling the clock divider (`STO 1` to address `0x9`) holds `pc` static for many cycles. |
+
+**Group 2 — Regression tests for issues found during review** (each pins down a
+specific fix so it can't silently regress):
+
+| Test | Verifies |
+| :--- | :--- |
+| `test_bug_stoc_should_invert_for_peripheral_addresses` | `STOC` inverts `RR` the same way for peripheral addresses (`0x8`/`0x9`/`0xC`) as it does for scratch registers `0x0`-`0x7`. |
+| `test_bug_peripheral_writes_alias_every_fastclock_while_parked` | Peripheral writes fire exactly once — not every physical clock cycle, and not delayed — while the clock divider parks the CPU on a `STO`/`STOC` instruction. |
+
+**Group 3 — Documentation / spec-compliance checks** (guard against docs and RTL
+silently drifting apart):
+
+| Test | Verifies |
+| :--- | :--- |
+| `test_doc_addr8to15_are_not_a_uniform_input_port` | Address `0xA` is hard-wired to `0`, not a live `ui_in` tap, matching [ISA.md](ISA.md)'s address map rather than the old (incorrect) "uniform input port" description this test is named after. |
+
 ### 2. Gate-Level Netlist (GL) Layout Hardening
 When OpenLane/LibreLane finishes layout compilation, a Gate-Level simulation (`GATES=yes`) verifies the synthesized netlist cells against the physical IHP standard cell simulation libraries.
 
