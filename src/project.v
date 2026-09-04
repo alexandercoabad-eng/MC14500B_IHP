@@ -18,7 +18,12 @@ module tt_um_mc14500b_soc_extended (
     // 1. Core Memory and Control Registers
     // =========================================================================
     reg [7:0] prog_memory [0:63]; // 64-Byte Instruction Memory
-    reg [15:0] ram_bank;          // Registers 0-7: General RAM, 8-15: Peripherals
+    reg [7:0]  ram_bank;           // Registers 0-7: General RAM (scratch bits)
+    reg [2:0]  ui_in_latch;        // One-cycle-delayed capture of ui_in[7:5],
+                                    // exposed read-only at addresses 0xD/0xE/0xF.
+                                    // (Only 3 bits are ever read back out of the
+                                    // 8 that used to be captured here, so the
+                                    // other 5 flip-flops were pure dead weight.)
     reg [5:0]  pc;                // Program Counter
     reg        instr_exec_done;   // Has the currently-fetched instruction already
                                    // fired its (one-shot) execution/write effects?
@@ -35,7 +40,6 @@ module tt_um_mc14500b_soc_extended (
 
     // Execution Core Signals
     wire core_data_in;
-    wire core_rr;
     wire core_write_en;
     wire core_data_out;
     reg  r_skip;
@@ -113,15 +117,14 @@ module tt_um_mc14500b_soc_extended (
     // 5. Memory Bus Data Multiplexing
     // =========================================================================
     wire [15:0] mapped_ram_bank;
-    assign mapped_ram_bank[7:0]   = ram_bank[7:0];
+    assign mapped_ram_bank[7:0]   = ram_bank;
     assign mapped_ram_bank[8]     = edge_flag;          // Feature 1 readback
     assign mapped_ram_bank[9]     = use_slow_clk;       // Feature 2 readback
     assign mapped_ram_bank[11:10] = 2'b00;              // Reserved
     assign mapped_ram_bank[12]    = latched_uo_out[0];    // Feature 3 readback
-    assign mapped_ram_bank[15:13] = ram_bank[15:13];
+    assign mapped_ram_bank[15:13] = ui_in_latch;
 
     assign core_data_in  = mapped_ram_bank[operand];
-    assign core_rr       = r_rr;
     assign core_data_out = r_rr;
 
     // Core Write Enable Output
@@ -148,7 +151,8 @@ module tt_um_mc14500b_soc_extended (
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             pc              <= 6'b000000;
-            ram_bank        <= 16'h0000;
+            ram_bank        <= 8'h00;
+            ui_in_latch     <= 3'b000;
             r_rr            <= 1'b0;
             r_oen           <= 1'b1;
             r_ien           <= 1'b1;
@@ -193,7 +197,7 @@ module tt_um_mc14500b_soc_extended (
 
                 // Save bit logic to register addresses 0..7
                 if (core_write_en && (operand < 4'h8)) begin
-                    ram_bank[operand] <= effective_write_data;
+                    ram_bank[operand[2:0]] <= effective_write_data;
                 end
 
                 instr_exec_done <= 1'b1;
@@ -203,7 +207,7 @@ module tt_um_mc14500b_soc_extended (
             // divided-down) CPU clock step allows.
             if (cpu_clk_step) begin
                 pc              <= pc + 1'b1;
-                ram_bank[15:8]  <= ui_in;
+                ui_in_latch     <= ui_in[7:5];
                 instr_exec_done <= 1'b0;
             end
         end
